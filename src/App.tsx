@@ -500,12 +500,6 @@ export default function App() {
               <Key className="w-3 h-3" />
               {hasKey ? `${activeProvider.name} ✓` : 'Set API Key'}
             </button>
-            <button
-              onClick={() => { reset(); fileInputRef.current?.click(); }}
-              className="font-typewriter text-xs tracking-widest text-stone-400 hover:text-stone-700 transition-colors uppercase hidden sm:block"
-            >
-              Upload ↑
-            </button>
           </div>
         </div>
       </header>
