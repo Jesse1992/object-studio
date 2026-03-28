@@ -487,7 +487,7 @@ export default function App() {
   return (
     <div className="min-h-screen app-bg text-stone-900 selection:bg-amber-100">
       {/* Header */}
-      <header className="w-full border-b border-stone-200/70 bg-[#f7f3ec]/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="w-full border-b border-stone-200/70 bg-[#f4efe6] sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <span className="font-typewriter text-sm tracking-widest text-stone-500 uppercase">
             Catalog
