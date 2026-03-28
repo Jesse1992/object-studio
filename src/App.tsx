@@ -421,15 +421,25 @@ export default function App() {
       setStatus('processing');
       setErrorMsg('');
       setProgressPct(0);
+      setProgressText('Preparing...');
+
+      // Fake warm-up progress so the UI feels alive while the model loads
+      let warmupPct = 0;
+      const warmupTimer = setInterval(() => {
+        warmupPct = Math.min(warmupPct + 2, 18);
+        setProgressPct(warmupPct);
+      }, 120);
 
       setProgressText('Removing background...');
       const blob = await removeBackground(file, {
         progress: (_key: string, current: number, total: number) => {
-          const pct = Math.round((current / total) * 70);
+          clearInterval(warmupTimer);
+          const pct = Math.round(18 + (current / total) * 52);
           setProgressPct(pct);
           setProgressText(`Removing background  ${pct}%`);
         },
       });
+      clearInterval(warmupTimer);
       const trimmedUrl = await trimTransparentPixels(blob);
       const processedUrl = await keepLargestSubject(trimmedUrl);
       setProcessedImage(processedUrl);
