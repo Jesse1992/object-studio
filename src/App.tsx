@@ -128,7 +128,7 @@ function CatalogCard({
       </div>
       {/* Text: pinned to bottom */}
       <div
-        className="absolute inset-x-0 bottom-0 text-center z-10 px-6"
+        className="absolute inset-x-0 bottom-0 z-10 px-6 flex flex-col items-center"
         style={{ paddingBottom: '11%' }}
       >
         <p className="font-typewriter text-[13px] tracking-[0.08em] text-stone-700 leading-snug">
@@ -684,7 +684,7 @@ export default function App() {
                     </div>
                     {/* Text: pinned to bottom */}
                     <div
-                      className="absolute inset-x-0 bottom-0 text-center z-10 px-6"
+                      className="absolute inset-x-0 bottom-0 z-10 px-6 flex flex-col items-center"
                       style={{ paddingBottom: '11%' }}
                     >
                       <p className="font-typewriter text-[13px] tracking-[0.08em] text-stone-700 leading-snug">
@@ -738,7 +738,7 @@ export default function App() {
               >
                 <button
                   onClick={reset}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-stone-200 text-stone-500 text-sm rounded-full hover:bg-stone-100 hover:text-stone-700 transition-all duration-200"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-stone-400 text-stone-500 text-sm rounded-full hover:bg-stone-100 hover:text-stone-700 transition-all duration-200"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                   New photo
