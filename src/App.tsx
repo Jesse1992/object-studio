@@ -4,53 +4,133 @@ import { removeBackground } from '@imgly/background-removal';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
 
-const ENV_KEY = process.env.KIMI_API_KEY ?? '';
-const STORAGE_KEY = 'kimi_api_key';
-
-function getApiKey(): string {
-  return localStorage.getItem(STORAGE_KEY) || ENV_KEY;
+// ── AI Provider Config ──────────────────────────────────────────
+interface Provider {
+  id: string;
+  name: string;
+  baseUrl: string;
+  model: string;
+  placeholder: string;
+  keyUrl: string;
+  note?: string;
 }
 
-async function describeImageWithKimi(base64Data: string, mimeType: string): Promise<{ line1: string; line2?: string }> {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error('请先设置 Kimi API Key');
-  const res = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+const PROVIDERS: Provider[] = [
+  {
+    id: 'moonshot',
+    name: 'Kimi (Moonshot)',
+    baseUrl: 'https://api.moonshot.cn/v1',
+    model: 'moonshot-v1-8k-vision-preview',
+    placeholder: 'sk-...',
+    keyUrl: 'https://platform.moonshot.cn/console/api-keys',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    placeholder: 'sk-...',
+    keyUrl: 'https://platform.openai.com/api-keys',
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    model: 'gemini-2.0-flash',
+    placeholder: 'AIza...',
+    keyUrl: 'https://aistudio.google.com/app/apikey',
+    note: 'Gemini via OpenAI-compatible endpoint',
+  },
+  {
+    id: 'glm',
+    name: '智谱 GLM',
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    model: 'glm-4v-flash',
+    placeholder: '...',
+    keyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+  },
+  {
+    id: 'qwen',
+    name: '通义千问',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    model: 'qwen-vl-max',
+    placeholder: 'sk-...',
+    keyUrl: 'https://bailian.console.aliyun.com/',
+    note: '需开通 DashScope 百炼',
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    model: 'deepseek-chat',
+    placeholder: 'sk-...',
+    keyUrl: 'https://platform.deepseek.com/api_keys',
+    note: '文字描述（暂不支持图片识别）',
+  },
+];
+
+const PROVIDER_STORAGE = 'ai_provider';
+const ENV_KEY = process.env.KIMI_API_KEY ?? '';
+
+function getProviderKey(providerId: string): string {
+  const stored = localStorage.getItem(`ai_key_${providerId}`);
+  if (stored) return stored;
+  if (providerId === 'moonshot') return ENV_KEY;
+  return '';
+}
+
+function saveProviderKey(providerId: string, key: string) {
+  localStorage.setItem(`ai_key_${providerId}`, key);
+  localStorage.setItem(PROVIDER_STORAGE, providerId);
+}
+
+function getCurrentProvider(): Provider {
+  const id = localStorage.getItem(PROVIDER_STORAGE) || 'moonshot';
+  return PROVIDERS.find(p => p.id === id) || PROVIDERS[0];
+}
+
+const PROMPT = 'Identify the main object in this image. Give it a concise, poetic product name in English like a vintage catalog label (3–7 words total). If it reads better on two lines, split into line1 and line2; otherwise just line1. Reply with JSON only, no extra text. Schema: { "line1": string, "line2"?: string }';
+
+async function describeImage(
+  base64Data: string,
+  mimeType: string,
+  provider: Provider,
+  apiKey: string,
+): Promise<{ line1: string; line2?: string }> {
+  if (!apiKey) throw new Error(`请先设置 ${provider.name} API Key`);
+
+  const messages =
+    provider.id === 'deepseek'
+      ? [{ role: 'user', content: PROMPT }]
+      : [
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } },
+              { type: 'text', text: PROMPT },
+            ],
+          },
+        ];
+
+  const res = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'moonshot-v1-8k-vision-preview',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64Data}` },
-            },
-            {
-              type: 'text',
-              text: 'Identify the main object in this image. Give it a concise, poetic product name in English like a vintage catalog label (3–7 words total). If it reads better on two lines, split into line1 and line2; otherwise just line1. Reply with JSON only, no extra text. Schema: { "line1": string, "line2"?: string }',
-            },
-          ],
-        },
-      ],
-      temperature: 0.7,
-    }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model: provider.model, messages, temperature: 0.7 }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`Kimi API error: ${err}`);
+    throw new Error(`${provider.name} API error: ${err}`);
   }
 
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content ?? '{}';
-  // Strip possible markdown code fences
   const json = content.replace(/```json?/g, '').replace(/```/g, '').trim();
-  return JSON.parse(json);
+  try {
+    return JSON.parse(json);
+  } catch {
+    return { line1: content.trim().slice(0, 60) };
+  }
 }
 
 type Status = 'idle' | 'processing' | 'success' | 'error';
@@ -157,8 +237,11 @@ export default function App() {
   const [editSub, setEditSub] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
-  const [keyInput, setKeyInput] = useState('');
-  const [savedKey, setSavedKey] = useState(() => localStorage.getItem(STORAGE_KEY) || ENV_KEY);
+  const [activeProvider, setActiveProvider] = useState<Provider>(() => getCurrentProvider());
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>(() =>
+    Object.fromEntries(PROVIDERS.map(p => [p.id, getProviderKey(p.id)]))
+  );
+  const hasKey = !!getProviderKey(activeProvider.id);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLDivElement>(null!);
@@ -199,7 +282,9 @@ export default function App() {
       const base64Data = dataUrl.split(',')[1];
       const mimeType = file.type;
 
-      const result = await describeImageWithKimi(base64Data, mimeType);
+      const provider = getCurrentProvider();
+      const apiKey = getProviderKey(provider.id);
+      const result = await describeImage(base64Data, mimeType, provider, apiKey);
       setProgressPct(95);
       const cap = result.line1 || 'Unknown Object';
       const subLine = result.line2 || '';
@@ -365,12 +450,11 @@ export default function App() {
           </span>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => { setKeyInput(savedKey); setShowKeyModal(true); }}
-              className={`inline-flex items-center gap-1.5 font-typewriter text-xs tracking-wider transition-colors uppercase ${savedKey ? 'text-stone-400 hover:text-stone-700' : 'text-amber-500 hover:text-amber-700'}`}
-              title="Set Kimi API Key"
+              onClick={() => setShowKeyModal(true)}
+              className={`inline-flex items-center gap-1.5 font-typewriter text-xs tracking-wider transition-colors uppercase ${hasKey ? 'text-stone-400 hover:text-stone-700' : 'text-amber-500 hover:text-amber-700'}`}
             >
               <Key className="w-3 h-3" />
-              {savedKey ? 'API Key ✓' : 'Set API Key'}
+              {hasKey ? `${activeProvider.name} ✓` : 'Set API Key'}
             </button>
             <button
               onClick={() => { reset(); fileInputRef.current?.click(); }}
@@ -390,57 +474,106 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center px-4"
-            style={{ background: 'rgba(30,20,10,0.35)', backdropFilter: 'blur(4px)' }}
+            style={{ background: 'rgba(30,20,10,0.4)', backdropFilter: 'blur(6px)' }}
             onClick={(e) => { if (e.target === e.currentTarget) setShowKeyModal(false); }}
           >
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.97 }}
-              className="w-full max-w-md bg-[#f7f3ec] rounded-2xl p-8 shadow-2xl border border-stone-200/60"
+              className="w-full max-w-lg bg-[#f7f3ec] rounded-2xl shadow-2xl border border-stone-200/60 overflow-hidden"
             >
-              <div className="flex items-start justify-between mb-6">
+              {/* Header */}
+              <div className="flex items-center justify-between px-7 pt-7 pb-5">
                 <div>
-                  <h2 className="font-serif text-xl text-stone-800">Kimi API Key</h2>
-                  <p className="font-typewriter text-xs text-stone-400 mt-1 tracking-wide">
-                    从 platform.moonshot.cn 获取
+                  <h2 className="font-serif text-xl text-stone-800">AI Provider</h2>
+                  <p className="font-typewriter text-xs text-stone-400 mt-0.5 tracking-wide">
+                    选择模型并填入对应 API Key
                   </p>
                 </div>
-                <button onClick={() => setShowKeyModal(false)} className="text-stone-300 hover:text-stone-500 transition-colors mt-1">
+                <button onClick={() => setShowKeyModal(false)} className="text-stone-300 hover:text-stone-500 transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <input
-                type="password"
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="sk-..."
-                className="w-full bg-white/70 border border-stone-200 rounded-xl px-4 py-3 font-typewriter text-sm text-stone-700 focus:outline-none focus:border-stone-400 tracking-wide mb-4"
-                autoFocus
-              />
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    localStorage.setItem(STORAGE_KEY, keyInput);
-                    setSavedKey(keyInput);
-                    setShowKeyModal(false);
-                  }}
-                  className="flex-1 py-2.5 bg-stone-800 text-white text-sm rounded-full hover:bg-stone-700 transition-colors font-medium"
-                >
-                  Save
-                </button>
-                {savedKey && (
+
+              {/* Provider tabs */}
+              <div className="px-7 pb-4">
+                <div className="flex flex-wrap gap-2">
+                  {PROVIDERS.map(p => {
+                    const hasK = !!keyInputs[p.id];
+                    const isActive = activeProvider.id === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => setActiveProvider(p)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-typewriter tracking-wide border transition-all duration-150 ${
+                          isActive
+                            ? 'bg-stone-800 text-white border-stone-800'
+                            : 'bg-white/60 text-stone-500 border-stone-200 hover:border-stone-400 hover:text-stone-700'
+                        }`}
+                      >
+                        {hasK && <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-green-400' : 'bg-green-500'}`} />}
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Key input for selected provider */}
+              <div className="px-7 pb-7">
+                <div className="bg-white/50 border border-stone-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-typewriter text-xs text-stone-500 tracking-wide">
+                      {activeProvider.name} · <span className="text-stone-400">{activeProvider.model}</span>
+                    </p>
+                    <a
+                      href={activeProvider.keyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-typewriter text-xs text-stone-400 hover:text-stone-600 underline underline-offset-2 transition-colors"
+                    >
+                      获取 Key →
+                    </a>
+                  </div>
+                  {activeProvider.note && (
+                    <p className="font-typewriter text-[10px] text-amber-500 mb-2 tracking-wide">{activeProvider.note}</p>
+                  )}
+                  <input
+                    key={activeProvider.id}
+                    type="password"
+                    value={keyInputs[activeProvider.id] || ''}
+                    onChange={(e) => setKeyInputs(prev => ({ ...prev, [activeProvider.id]: e.target.value }))}
+                    placeholder={activeProvider.placeholder}
+                    className="w-full bg-transparent font-typewriter text-sm text-stone-700 focus:outline-none tracking-wide placeholder:text-stone-300"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-3 mt-4">
                   <button
                     onClick={() => {
-                      localStorage.removeItem(STORAGE_KEY);
-                      setSavedKey('');
-                      setKeyInput('');
+                      const key = keyInputs[activeProvider.id] || '';
+                      saveProviderKey(activeProvider.id, key);
+                      localStorage.setItem(PROVIDER_STORAGE, activeProvider.id);
+                      setShowKeyModal(false);
                     }}
-                    className="px-4 py-2.5 border border-stone-200 text-stone-400 text-sm rounded-full hover:bg-stone-100 transition-colors"
+                    className="flex-1 py-2.5 bg-stone-800 text-white text-sm rounded-full hover:bg-stone-700 transition-colors font-medium"
                   >
-                    Clear
+                    Save &amp; Use {activeProvider.name}
                   </button>
-                )}
+                  {keyInputs[activeProvider.id] && (
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem(`ai_key_${activeProvider.id}`);
+                        setKeyInputs(prev => ({ ...prev, [activeProvider.id]: '' }));
+                      }}
+                      className="px-4 py-2.5 border border-stone-200 text-stone-400 text-sm rounded-full hover:bg-stone-100 transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>
