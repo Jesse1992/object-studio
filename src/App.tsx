@@ -247,8 +247,8 @@ function CatalogCard({
     <CardLayout innerRef={innerRef}>
       {/* Image: top 72%, with top breathing room */}
       <div
-        className="absolute inset-x-0 flex items-center justify-center z-10 px-6"
-        style={{ top: '4%', bottom: '22%' }}
+        className="absolute inset-x-0 flex items-center justify-center z-10 px-12"
+        style={{ top: '8%', bottom: '26%' }}
       >
         <img
           src={imageSrc}
@@ -421,16 +421,17 @@ export default function App() {
         img.onerror = rej;
       });
 
-      // Image area: top 82% of card, padded 6% top + px-6 sides
-      const padTop = H * 0.06;
-      const padSide = 24 * SCALE;
-      const areaH = H * 0.82 - padTop;
+      // Image area: top 8%~74% of card, centered; px-12 sides
+      const areaTop = H * 0.08;
+      const areaBottom = H * 0.74;
+      const padSide = 48 * SCALE;
+      const areaH = areaBottom - areaTop;
       const areaW = W - padSide * 2;
       const scaleImg = Math.min(areaW / img.naturalWidth, areaH / img.naturalHeight);
       const drawW = img.naturalWidth * scaleImg;
       const drawH = img.naturalHeight * scaleImg;
       const drawX = padSide + (areaW - drawW) / 2;
-      const drawY = padTop + (areaH - drawH) / 2;
+      const drawY = areaTop + (areaH - drawH) / 2;
 
       // Drop shadow
       ctx.save();
@@ -842,8 +843,8 @@ export default function App() {
                   <CardLayout innerRef={resultRef} className="shadow-2xl shadow-stone-400/30">
                     {/* Image: top 72%, with top breathing room */}
                     <div
-                      className="absolute inset-x-0 flex items-center justify-center z-10 px-6"
-                      style={{ top: '4%', bottom: '22%' }}
+                      className="absolute inset-x-0 flex items-center justify-center z-10 px-12"
+                      style={{ top: '8%', bottom: '26%' }}
                     >
                       <img
                         src={processedImage}
