@@ -492,9 +492,6 @@ export default function App() {
           <span className="font-typewriter text-sm tracking-widest text-stone-500 uppercase">
             Catalog
           </span>
-          <span className="font-serif text-lg text-stone-800 tracking-tight">
-            Object Studio
-          </span>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowKeyModal(true)}
