@@ -133,13 +133,33 @@ async function keepLargestSubject(dataUrl: string): Promise<string> {
       }
 
       // Erase all pixels not belonging to the largest component
+      // and find the bounding box of the remaining subject
+      let top = H, bottom = 0, left = W, right = 0;
       for (let i = 0; i < W * H; i++) {
         if (labels[i] !== largestLabel) {
           data[i * 4 + 3] = 0;
+        } else {
+          const y = Math.floor(i / W);
+          const x = i % W;
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+          if (x < left) left = x;
+          if (x > right) right = x;
         }
       }
       ctx.putImageData(imageData, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+
+      // Re-crop to the subject's bounding box so it's centered when displayed
+      const pad = Math.max(8, Math.round(Math.max(W, H) * 0.02));
+      const cx = Math.max(0, left - pad);
+      const cy = Math.max(0, top - pad);
+      const cw = Math.min(W - cx, right - cx + pad * 2 + 1);
+      const ch = Math.min(H - cy, bottom - cy + pad * 2 + 1);
+      const out = document.createElement('canvas');
+      out.width = cw;
+      out.height = ch;
+      out.getContext('2d')!.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
+      resolve(out.toDataURL('image/png'));
     };
     img.src = dataUrl;
   });
