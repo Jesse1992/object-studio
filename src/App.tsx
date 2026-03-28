@@ -247,8 +247,8 @@ function CatalogCard({
     <CardLayout innerRef={innerRef}>
       {/* Image: top 72%, with top breathing room */}
       <div
-        className="absolute inset-x-0 top-0 flex items-center justify-center z-10 px-6"
-        style={{ height: '82%', paddingTop: '6%' }}
+        className="absolute inset-x-0 flex items-center justify-center z-10 px-6"
+        style={{ top: '4%', bottom: '22%' }}
       >
         <img
           src={imageSrc}
@@ -842,8 +842,8 @@ export default function App() {
                   <CardLayout innerRef={resultRef} className="shadow-2xl shadow-stone-400/30">
                     {/* Image: top 72%, with top breathing room */}
                     <div
-                      className="absolute inset-x-0 top-0 flex items-center justify-center z-10 px-6"
-                      style={{ height: '82%', paddingTop: '6%' }}
+                      className="absolute inset-x-0 flex items-center justify-center z-10 px-6"
+                      style={{ top: '4%', bottom: '22%' }}
                     >
                       <img
                         src={processedImage}
