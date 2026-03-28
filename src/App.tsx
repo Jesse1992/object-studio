@@ -57,22 +57,22 @@ type Status = 'idle' | 'processing' | 'success' | 'error';
 
 const SAMPLES = [
   {
-    src: '/samples/sample1.png',
+    src: import.meta.env.BASE_URL + 'samples/sample1.png',
     caption: 'Bow tie belt lanyard',
     sub: 'employee badge',
   },
   {
-    src: '/samples/sample2.png',
+    src: import.meta.env.BASE_URL + 'samples/sample2.png',
     caption: 'Hand-carved simulated flip',
     sub: 'phone pendant',
   },
   {
-    src: '/samples/sample3.png',
+    src: import.meta.env.BASE_URL + 'samples/sample3.png',
     caption: 'Lace bowknot texture',
     sub: 'underarm bag',
   },
   {
-    src: '/samples/sample4.png',
+    src: import.meta.env.BASE_URL + 'samples/sample4.png',
     caption: 'Spring season diamond pattern',
     sub: 'V-neck sweater',
   },
