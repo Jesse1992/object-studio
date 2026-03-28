@@ -245,24 +245,25 @@ function CatalogCard({
 }) {
   return (
     <CardLayout innerRef={innerRef}>
-      {/* Image: top 72%, with top breathing room */}
+      {/* Image: absolute fill entire card, centered with padding; bottom padding reserves text space */}
       <div
-        className="absolute inset-x-0 flex items-center justify-center z-10 px-12"
-        style={{ top: '8%', bottom: '26%' }}
+        className="absolute inset-0 flex items-center justify-center z-10 overflow-hidden"
+        style={{ padding: '8% 14% 28% 14%' }}
       >
         <img
           src={imageSrc}
           alt={caption}
-          className="max-w-full max-h-full object-contain"
-          style={{ filter: 'drop-shadow(0 8px 24px rgba(80,60,30,0.13))' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 8px 24px rgba(80,60,30,0.13))',
+          }}
           crossOrigin="anonymous"
         />
       </div>
-      {/* Text: pinned to bottom */}
-      <div
-        className="absolute inset-x-0 bottom-0 z-10 px-6 flex flex-col items-center"
-        style={{ paddingBottom: '11%' }}
-      >
+      {/* Text: absolute bottom */}
+      <div className="absolute inset-x-0 bottom-0 z-10 px-6 flex flex-col items-center" style={{ paddingBottom: '9%' }}>
         <p className="font-typewriter text-[13px] tracking-[0.08em] text-stone-700 leading-snug">
           {caption}
         </p>
@@ -397,18 +398,16 @@ export default function App() {
       ctx.fillStyle = '#EFE2D6';
       ctx.fillRect(0, 0, W, H);
 
-      // Prominent fiber grain + speckle (matching reference cardstock texture)
+      // Paper grain: pure random noise, no sin waves to avoid stripes
       const imageData = ctx.getImageData(0, 0, W, H);
       const data = imageData.data;
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
           const idx = (y * W + x) * 4;
-          const speckle = (Math.random() - 0.5) * 28;
-          const fiber = Math.sin(y * 0.10) * 5 + Math.sin(y * 0.27 + x * 0.003) * 3;
-          const delta = speckle + fiber;
-          data[idx]     = Math.min(255, Math.max(0, data[idx]     + delta));
-          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + delta * 0.97));
-          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + delta * 0.88));
+          const grain = (Math.random() - 0.5) * 22;
+          data[idx]     = Math.min(255, Math.max(0, data[idx]     + grain));
+          data[idx + 1] = Math.min(255, Math.max(0, data[idx + 1] + grain * 0.97));
+          data[idx + 2] = Math.min(255, Math.max(0, data[idx + 2] + grain * 0.88));
         }
       }
       ctx.putImageData(imageData, 0, 0);
@@ -421,10 +420,15 @@ export default function App() {
         img.onerror = rej;
       });
 
-      // Image area: top 8%~74% of card, centered; px-12 sides
-      const areaTop = H * 0.08;
-      const areaBottom = H * 0.74;
-      const padSide = 48 * SCALE;
+      // Image area mirrors CSS: padding 6% top, 10% sides, 26% bottom
+      const fontSize = 13 * SCALE;
+      const lineH0 = fontSize * 1.4;
+      const lines0 = [caption, sub].filter(Boolean);
+      const padTop = H * 0.08;
+      const padBottom = H * 0.28;
+      const padSide = W * 0.14;
+      const areaTop = padTop;
+      const areaBottom = H - padBottom;
       const areaH = areaBottom - areaTop;
       const areaW = W - padSide * 2;
       const scaleImg = Math.min(areaW / img.naturalWidth, areaH / img.naturalHeight);
@@ -441,19 +445,16 @@ export default function App() {
       ctx.drawImage(img, drawX, drawY, drawW, drawH);
       ctx.restore();
 
-      // Text
-      const fontSize = 13 * SCALE;
+      // Text (reuse fontSize/lineH0/lines0 computed above)
       ctx.font = `${fontSize}px "Courier Prime", "Courier New", monospace`;
       ctx.fillStyle = '#57534e';
       ctx.textAlign = 'center';
       ctx.letterSpacing = `${0.08 * fontSize}px`;
-      const lineH = fontSize * 1.4;
-      const lines = [caption, sub].filter(Boolean);
-      const textTotalH = lines.length * lineH;
+      const textTotalH = lines0.length * lineH0;
       const bottomPad = H * 0.11;
-      const textBaseY = H - bottomPad - textTotalH + lineH * 0.8;
-      lines.forEach((line, i) => {
-        ctx.fillText(line, W / 2, textBaseY + i * lineH);
+      const textBaseY = H - bottomPad - textTotalH + lineH0 * 0.8;
+      lines0.forEach((line, i) => {
+        ctx.fillText(line!, W / 2, textBaseY + i * lineH0);
       });
 
       // Subtle vignette
@@ -841,24 +842,25 @@ export default function App() {
                 {/* The Card */}
                 {processedImage && (
                   <CardLayout innerRef={resultRef} className="shadow-2xl shadow-stone-400/30">
-                    {/* Image: top 72%, with top breathing room */}
+                    {/* Image: absolute fill entire card, centered; bottom padding reserves text space */}
                     <div
-                      className="absolute inset-x-0 flex items-center justify-center z-10 px-12"
-                      style={{ top: '8%', bottom: '26%' }}
+                      className="absolute inset-0 flex items-center justify-center z-10 overflow-hidden"
+                      style={{ padding: '8% 14% 28% 14%' }}
                     >
                       <img
                         src={processedImage}
                         alt={caption}
-                        className="max-w-full max-h-full object-contain"
-                        style={{ filter: 'drop-shadow(0 10px 28px rgba(80,60,30,0.15))' }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          filter: 'drop-shadow(0 10px 28px rgba(80,60,30,0.15))',
+                        }}
                         crossOrigin="anonymous"
                       />
                     </div>
-                    {/* Text: pinned to bottom */}
-                    <div
-                      className="absolute inset-x-0 bottom-0 z-10 px-6 flex flex-col items-center"
-                      style={{ paddingBottom: '11%' }}
-                    >
+                    {/* Text: absolute bottom */}
+                    <div className="absolute inset-x-0 bottom-0 z-10 px-6 flex flex-col items-center" style={{ paddingBottom: '9%' }}>
                       <p className="font-typewriter text-[13px] tracking-[0.08em] text-stone-700 leading-snug">
                         {caption}
                       </p>
