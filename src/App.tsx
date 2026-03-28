@@ -56,6 +56,95 @@ async function trimTransparentPixels(blob: Blob): Promise<string> {
   });
 }
 
+// Keep only the largest connected foreground subject (removes stray objects)
+async function keepLargestSubject(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const W = img.naturalWidth;
+      const H = img.naturalHeight;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, W, H);
+      const data = imageData.data;
+
+      // Build opacity mask (1 = foreground, 0 = transparent)
+      const mask = new Uint8Array(W * H);
+      for (let i = 0; i < W * H; i++) {
+        mask[i] = data[i * 4 + 3] > 10 ? 1 : 0;
+      }
+
+      // BFS connected components
+      const labels = new Int32Array(W * H).fill(-1);
+      const componentSizes: number[] = [];
+      const dx = [-1, 1, 0, 0];
+      const dy = [0, 0, -1, 1];
+      let labelCount = 0;
+
+      for (let startY = 0; startY < H; startY++) {
+        for (let startX = 0; startX < W; startX++) {
+          const startIdx = startY * W + startX;
+          if (mask[startIdx] !== 1 || labels[startIdx] !== -1) continue;
+
+          // BFS with head pointer (avoids slow array.shift)
+          const queue = new Int32Array(W * H);
+          let head = 0, tail = 0;
+          queue[tail++] = startIdx;
+          labels[startIdx] = labelCount;
+          let size = 0;
+
+          while (head < tail) {
+            const curr = queue[head++];
+            size++;
+            const cy = Math.floor(curr / W);
+            const cx = curr % W;
+            for (let d = 0; d < 4; d++) {
+              const nx = cx + dx[d];
+              const ny = cy + dy[d];
+              if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+              const nIdx = ny * W + nx;
+              if (mask[nIdx] === 1 && labels[nIdx] === -1) {
+                labels[nIdx] = labelCount;
+                queue[tail++] = nIdx;
+              }
+            }
+          }
+          componentSizes.push(size);
+          labelCount++;
+        }
+      }
+
+      if (labelCount <= 1) {
+        resolve(dataUrl);
+        return;
+      }
+
+      // Find the largest component
+      let largestLabel = 0;
+      let largestSize = 0;
+      for (let i = 0; i < componentSizes.length; i++) {
+        if (componentSizes[i] > largestSize) {
+          largestSize = componentSizes[i];
+          largestLabel = i;
+        }
+      }
+
+      // Erase all pixels not belonging to the largest component
+      for (let i = 0; i < W * H; i++) {
+        if (labels[i] !== largestLabel) {
+          data[i * 4 + 3] = 0;
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = dataUrl;
+  });
+}
+
 // ── AI Provider Config ──────────────────────────────────────────
 interface Provider {
   id: string;
@@ -321,7 +410,8 @@ export default function App() {
           setProgressText(`Removing background  ${pct}%`);
         },
       });
-      const processedUrl = await trimTransparentPixels(blob);
+      const trimmedUrl = await trimTransparentPixels(blob);
+      const processedUrl = await keepLargestSubject(trimmedUrl);
       setProcessedImage(processedUrl);
       setProgressPct(75);
 
