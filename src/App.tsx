@@ -4,6 +4,58 @@ import { removeBackground } from '@imgly/background-removal';
 import { motion, AnimatePresence } from 'motion/react';
 import html2canvas from 'html2canvas';
 
+// ── Trim transparent padding from a PNG blob ────────────────────
+async function trimTransparentPixels(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      const { naturalWidth: w, naturalHeight: h } = img;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      const { data } = ctx.getImageData(0, 0, w, h);
+      let top = h, bottom = 0, left = w, right = 0;
+
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const a = data[(y * w + x) * 4 + 3];
+          if (a > 10) {
+            if (y < top) top = y;
+            if (y > bottom) bottom = y;
+            if (x < left) left = x;
+            if (x > right) right = x;
+          }
+        }
+      }
+
+      if (right < left || bottom < top) {
+        resolve(canvas.toDataURL('image/png'));
+        return;
+      }
+
+      // Add a small padding so shadow isn't clipped
+      const pad = Math.max(8, Math.round(Math.max(w, h) * 0.02));
+      const cx = Math.max(0, left - pad);
+      const cy = Math.max(0, top - pad);
+      const cw = Math.min(w, right - cx + pad * 2);
+      const ch = Math.min(h, bottom - cy + pad * 2);
+
+      const out = document.createElement('canvas');
+      out.width = cw;
+      out.height = ch;
+      out.getContext('2d')!.drawImage(canvas, cx, cy, cw, ch, 0, 0, cw, ch);
+      resolve(out.toDataURL('image/png'));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 // ── AI Provider Config ──────────────────────────────────────────
 interface Provider {
   id: string;
@@ -268,12 +320,7 @@ export default function App() {
           setProgressText(`Removing background  ${pct}%`);
         },
       });
-      const processedUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      const processedUrl = await trimTransparentPixels(blob);
       setProcessedImage(processedUrl);
       setProgressPct(75);
 
